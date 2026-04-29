@@ -1,10 +1,12 @@
 import cv2
+import time
 from ultralytics import YOLO
 from fast_plate_ocr import LicensePlateRecognizer
 import onnxruntime as ort
 
 print(ort.get_available_providers())
-detector = YOLO("license_plate_detector.pt")
+model_path = r"D:\Projects\ANPR_POC\yolov8_finetune\license_plate_detector.pt"
+detector = YOLO(model_path)
 
 ocr_model = LicensePlateRecognizer(
     "cct-s-v2-global-model",
@@ -14,6 +16,7 @@ ocr_model = LicensePlateRecognizer(
 print("Model loaded")
 
 def read_plate(image_path):
+    start_time = time.time()
     img = cv2.imread(image_path)
     results = detector(image_path)[0]
 
@@ -43,7 +46,10 @@ def read_plate(image_path):
         print("Plate:", text)
         plates.append(text)
 
+    print(f"Total time: {time.time() - start_time:.3f}s")
     return plates
 
 
-read_plate(r"C:\Users\DevTekwani\Downloads\Imagepreview.png")
+read_plate(r"D:\Projects\ANPR_POC\inputs\Imagepreview.png")
+# read_plate(r"D:\Projects\ANPR_POC\inputs\images.jpg")
+# read_plate(r"D:\Projects\ANPR_POC\inputs\img1.jpg")
