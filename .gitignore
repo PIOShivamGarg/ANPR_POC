@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+
+# Environment
+.env
+
+# IDE
+.idea/
+.vscode/
+
+# Model weights (too large for git)
+*.weights
+*.pt
+*.pth
+*.onnx
+
+# Dataset images (excluded due to size)
+dataset/train/images/
+dataset/valid/images/
+dataset/test/images/
+
+# Output files
+output/
+outputs/
+runs/
+
+# Input files
+inputs/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
