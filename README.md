@@ -66,4 +66,4 @@ This is a Proof of Concept project.
 
 ## Author
 
-Shivam Garg
+Shivam Garg, Dev Tekwani

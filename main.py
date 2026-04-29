@@ -1,139 +1,97 @@
 import cv2
-import easyocr
+from matplotlib import pyplot as plt
 import numpy as np
-from ultralytics import YOLO
+import imutils
+import easyocr
+import time
 
-# ──────────────────────────────────────────────
-# 1. Load Models
-# ──────────────────────────────────────────────
-model  = YOLO("yolov8n.pt")          # downloads automatically on first run
-reader = easyocr.Reader(['en'])       # add 'hi' for Hindi/Devanagari plates
+print("="*50)
+print("ANPR - Automatic Number Plate Recognition")
+print("="*50)
 
-# COCO class IDs for vehicles
-VEHICLE_CLASSES = {
-    2: "car",
-    3: "motorcycle",
-    5: "bus",
-    7: "truck"
-}
+start_time = time.time()
 
-# ──────────────────────────────────────────────
-# 2. Preprocessing helpers
-# ──────────────────────────────────────────────
-def preprocess_for_ocr(crop: np.ndarray) -> np.ndarray:
-    """
-    Upscale → grayscale → denoise → threshold.
-    Better contrast = better OCR results.
-    """
-    # Upscale 2x so EasyOCR gets enough resolution
-    h, w = crop.shape[:2]
-    crop = cv2.resize(crop, (w * 2, h * 2), interpolation=cv2.INTER_CUBIC)
+print("\n[1/6] Loading image...")
+step_start = time.time()
+img = cv2.imread('images.jpg')
+# img = cv2.imread('number_plate.jpg')
+print(f"    ✓ Image loaded in {time.time() - step_start:.3f}s")
 
-    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+print("\n[2/6] Preprocessing image...")
+step_start = time.time()
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+plt.imshow(cv2.cvtColor(gray, cv2.COLOR_BGR2RGB))
+plt.title('Grayscale Image')
+plt.show()
 
-    # Mild blur to kill noise without losing edges
-    gray = cv2.GaussianBlur(gray, (3, 3), 0)
+bfilter = cv2.bilateralFilter(gray, 11, 17, 17)
+edged = cv2.Canny(bfilter, 30, 200)
+print(f"    ✓ Preprocessing completed in {time.time() - step_start:.3f}s")
+plt.imshow(cv2.cvtColor(edged, cv2.COLOR_BGR2RGB))
+plt.title('Edge Detection')
+plt.show()
 
-    # Otsu binarisation (auto threshold)
-    _, thresh = cv2.threshold(
-        gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-    )
-    return thresh
+print("\n[3/6] Detecting license plate...")
+step_start = time.time()
+keypoints = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+contours = imutils.grab_contours(keypoints)
+contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
 
+location = None
+for contour in contours:
+    approx = cv2.approxPolyDP(contour, 10, True)
+    if len(approx) == 4:
+        location = approx
+        break
 
-def clean_plate_text(ocr_results: list, min_prob: float = 0.3) -> str:
-    """Merge all OCR tokens above confidence threshold into one string."""
-    tokens = [
-        text.upper().strip()
-        for (_, text, prob) in ocr_results
-        if prob >= min_prob and text.strip()
-    ]
-    return " ".join(tokens)
+if location is not None:
+    print(f"    ✓ License plate detected in {time.time() - step_start:.3f}s")
+else:
+    print(f"    ✗ No license plate found")
 
+location
 
-# ──────────────────────────────────────────────
-# 3. Core pipeline
-# ──────────────────────────────────────────────
-def detect_plates(image_path: str, conf_threshold: float = 0.4) -> dict:
-    """
-    Detect vehicles → crop ROI → preprocess → OCR.
-    Returns annotated image path + list of plate readings.
-    """
-    img = cv2.imread(image_path)
-    if img is None:
-        raise FileNotFoundError(f"Cannot read image: {image_path}")
+print("\n[4/6] Extracting plate region...")
+step_start = time.time()
+mask = np.zeros(gray.shape, np.uint8)
+new_image = cv2.drawContours(mask, [location], 0,255, -1)
+new_image = cv2.bitwise_and(img, img, mask=mask)
 
-    results     = model(image_path)[0]
-    detections  = []
+plt.imshow(cv2.cvtColor(new_image, cv2.COLOR_BGR2RGB))
+plt.title('Masked License Plate')
+plt.show()
 
-    for box in results.boxes:
-        cls_id     = int(box.cls[0])
-        confidence = float(box.conf[0])
+(x,y) = np.where(mask==255)
+(x1, y1) = (np.min(x), np.min(y))
+(x2, y2) = (np.max(x), np.max(y))
+cropped_image = gray[x1:x2+1, y1:y2+1]
+print(f"    ✓ Plate region extracted in {time.time() - step_start:.3f}s")
 
-        # Only process vehicles above confidence threshold
-        if cls_id not in VEHICLE_CLASSES or confidence < conf_threshold:
-            continue
+plt.imshow(cv2.cvtColor(cropped_image, cv2.COLOR_BGR2RGB))
+plt.title('Cropped License Plate')
+plt.show()
 
-        x1, y1, x2, y2 = map(int, box.xyxy[0])
-        vehicle_label   = VEHICLE_CLASSES[cls_id]
+print("\n[5/6] Running OCR...")
+step_start = time.time()
+reader = easyocr.Reader(['en',"tr"])
+result = reader.readtext(cropped_image)
+print(f"    ✓ OCR completed in {time.time() - step_start:.3f}s")
+result
 
-        # ── Crop the full vehicle ROI ──────────────────
-        vehicle_crop = img[y1:y2, x1:x2]
+print("\n[6/6] Generating result...")
+step_start = time.time()
+text = result[0][-2]
+font = cv2.FONT_HERSHEY_SIMPLEX
+res = cv2.putText(img, text=text, org=(approx[0][0][0], approx[1][0][1]+60), fontFace=font, fontScale=0.5, color=(0,255,0), thickness=1, lineType=cv2.LINE_AA)
+res = cv2.rectangle(img, tuple(approx[0][0]), tuple(approx[2][0]), (0,255,0),3)
+plt.imshow(cv2.cvtColor(res, cv2.COLOR_BGR2RGB))
+plt.title('Final Result with Detected Plate')
+plt.show()
+print(f"    ✓ Result generated in {time.time() - step_start:.3f}s")
 
-        # ── Focus on lower 35% of the vehicle
-        #    (plates are almost always near the bumper)
-        h = vehicle_crop.shape[0]
-        plate_roi = vehicle_crop[int(h * 0.65):, :]   # bottom 35 %
-
-        # ── Preprocess & OCR ──────────────────────────
-        processed  = preprocess_for_ocr(plate_roi)
-        ocr_output = reader.readtext(processed)
-        plate_text = clean_plate_text(ocr_output)
-
-        detections.append({
-            "vehicle":    vehicle_label,
-            "confidence": round(confidence, 2),
-            "bbox":       (x1, y1, x2, y2),
-            "plate_text": plate_text or "Not detected"
-        })
-
-        # ── Annotate original image ───────────────────
-        color = (0, 220, 100)
-        cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
-        label = f"{vehicle_label} | {plate_text or 'N/A'}"
-        cv2.putText(
-            img, label,
-            (x1, max(y1 - 10, 20)),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, 2
-        )
-
-    # Save annotated result
-    output_path = "output_annotated.jpg"
-    cv2.imwrite(output_path, img)
-
-    return {
-        "output_image": output_path,
-        "detections":   detections
-    }
-
-
-# ──────────────────────────────────────────────
-# 4. Run it
-# ──────────────────────────────────────────────
-if __name__ == "__main__":
-    IMAGE_PATH = "D:\projects\ANPR_POC\Img1.jpg"          # ← change to your image
-
-    result = detect_plates(IMAGE_PATH)
-
-    print(f"\n✅ Annotated image saved → {result['output_image']}\n")
-    print(f"{'─'*45}")
-
-    if not result["detections"]:
-        print("⚠  No vehicles detected. Try a lower conf_threshold.")
-    else:
-        for i, det in enumerate(result["detections"], 1):
-            print(f"[{i}] Vehicle   : {det['vehicle']}")
-            print(f"    Confidence: {det['confidence']}")
-            print(f"    BBox      : {det['bbox']}")
-            print(f"    Plate     : {det['plate_text']}")
-            print(f"{'─'*45}")
+total_time = time.time() - start_time
+print("\n" + "="*50)
+print(f"✓ DETECTED PLATE NUMBER: {text}")
+print(f"✓ Total execution time: {total_time:.3f}s")
+print("="*50)
+print("="*50)
