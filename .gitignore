@@ -27,12 +27,7 @@ dataset/valid/images/
 dataset/test/images/
 
 # Output files
-output/
-outputs/
 runs/
-
-# Input files
-inputs/
 
 # Logs
 *.log

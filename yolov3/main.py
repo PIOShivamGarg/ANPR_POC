@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 import easyocr
-import os
 import time
 
 def extract_plate_text(image_path, config_path, weights_path):
@@ -83,9 +82,9 @@ def extract_plate_text(image_path, config_path, weights_path):
 
 if __name__ == '__main__':
     # Update these paths to the absolute paths on your local machine
-    IMG_PATH = 'D:\projects\ANPR_POC\images.jpg'
-    CFG_PATH = 'D:\projects\ANPR_POC\darknet-yolov3.cfg'
-    WEIGHTS_PATH = 'D:\projects\ANPR_POC\lapi.weights'
+    IMG_PATH = 'D:\\projects\\ANPR_POC\\inputs\\images.jpg'
+    CFG_PATH = 'D:\\projects\\ANPR_POC\\yolov3\\darknet-yolov3.cfg'
+    WEIGHTS_PATH = 'D:\\projects\\ANPR_POC\\yolov3\\lapi.weights'
 
     print("="*50)
     print("Starting License Plate Recognition")

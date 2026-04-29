@@ -121,7 +121,7 @@ def detect_plates(image_path: str, conf_threshold: float = 0.4) -> dict:
 # 4. Run it
 # ──────────────────────────────────────────────
 if __name__ == "__main__":
-    IMAGE_PATH = "D:\projects\ANPR_POC\Img1.jpg"          # ← change to your image
+    IMAGE_PATH = "D:\\projects\\ANPR_POC\\inputs\\Img1.jpg"          # ← change to your image
 
     result = detect_plates(IMAGE_PATH)
 

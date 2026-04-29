@@ -13,7 +13,7 @@ start_time = time.time()
 
 print("\n[1/6] Loading image...")
 step_start = time.time()
-img = cv2.imread('images.jpg')
+img = cv2.imread('D:\\Projects\\ANPR_POC\\inputs\\Imagepreview.png')
 # img = cv2.imread('number_plate.jpg')
 print(f"    ✓ Image loaded in {time.time() - step_start:.3f}s")
 

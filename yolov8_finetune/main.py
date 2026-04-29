@@ -80,5 +80,5 @@ def read_plate(image_path):
     return detected_plates
 
 
-plates = read_plate(r"D:\projects\ANPR_POC\inputs\images.jpg")
+plates = read_plate(r"D:\projects\ANPR_POC\inputs\Img1.jpg")
 print("Detected Plates:", plates)
