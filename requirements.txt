@@ -1,15 +1,17 @@
-# Deep Learning Frameworks
+# Core ML
 torch>=2.11.0
-torchvision>=0.26.0
 ultralytics>=8.4.42
 
 # Computer Vision
 opencv-contrib-python>=4.13.0.92
 
-# OCR Libraries
-fast-plate-ocr>=0.1.5
-onnxruntime>=1.16.0
+# OCR
+fast-plate-ocr[onnx]>=0.1.5
 
-# Scientific Computing
-numpy>=2.2.0
-pillow>=12.2.0
+# Utils
+python-dotenv>=0.21.0
+
+# API Server
+fastapi>=0.100.0
+uvicorn>=0.34.0
+python-multipart>=0.0.5
