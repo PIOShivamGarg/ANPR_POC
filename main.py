@@ -5,14 +5,10 @@ import json
 import shutil
 import tempfile
 from fast_alpr import ALPR
-from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 
-load_dotenv()
-
 # ─── Load Models ────────────────────────────────────────────────────────────────
-input_folder = os.getenv("INPUT_FOLDER", "Vehicle License Plate List")
 
 # Initialize ALPR with default models (handles both detection and OCR)
 alpr = ALPR(
@@ -137,7 +133,7 @@ def process_folder_api(folder_path: str = None):
         POST /process-folder?folder_path=/app/Vehicle License Plate List
         POST /process-folder (uses default INPUT_FOLDER)
     """
-    target_folder = folder_path if folder_path else input_folder
+    target_folder = folder_path
     
     if not os.path.exists(target_folder):
         raise HTTPException(

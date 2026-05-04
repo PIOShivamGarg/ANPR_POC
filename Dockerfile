@@ -23,9 +23,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 
-# Copy the model file (ensure this exists in your project root)
-COPY license_plate_detector.pt .
-
 # Copy all images from local folder into container
 COPY ["Vehicle License Plate List", "/app/Vehicle License Plate List"]
 

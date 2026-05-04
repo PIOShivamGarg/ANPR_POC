@@ -1,15 +1,9 @@
-# Core ML
-torch>=2.11.0
-ultralytics>=8.4.42
-
 # Computer Vision
 opencv-contrib-python>=4.13.0.92
 
-# OCR
-fast-plate-ocr[onnx]>=0.1.5
-
-# Utils
-python-dotenv>=0.21.0
+# ALPR (Automatic License Plate Recognition)
+fast-alpr>=0.1.0
+onnxruntime>=1.15.0
 
 # API Server
 fastapi>=0.100.0
