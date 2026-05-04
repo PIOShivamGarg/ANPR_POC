@@ -4,7 +4,7 @@ import os
 import json
 import shutil
 import tempfile
-from ultralytics import YOLO
+# from ultralytics import YOLO
 from fast_plate_ocr import LicensePlateRecognizer
 import onnxruntime as ort
 from dotenv import load_dotenv
@@ -19,7 +19,7 @@ print(ort.get_available_providers())
 model_path = os.getenv("MODEL_PATH", "license_plate_detector.pt")
 input_folder = os.getenv("INPUT_FOLDER", "Vehicle License Plate List")
 
-detector = YOLO(model_path)
+# detector = YOLO(model_path)
 
 ocr_model = LicensePlateRecognizer(
     "cct-s-v2-global-model",
@@ -37,35 +37,70 @@ app = FastAPI(
 
 
 # ─── Core Logic ─────────────────────────────────────────────────────────────────
+
+# ─── Old function using both detector and OCR (commented out) ───────────────────
+# def read_plate(image_path: str) -> dict:
+#     start_time = time.time()
+#     img = cv2.imread(image_path)
+#
+#     if img is None:
+#         return {"error": f"Failed to read image: {image_path}", "plates": []}
+#
+#     results = detector(image_path, verbose=False)[0]
+#     plates = []
+#
+#     for box in results.boxes:
+#         x1, y1, x2, y2 = map(int, box.xyxy[0])
+#         conf = float(box.conf[0])
+#
+#         if conf < 0.4:
+#             continue
+#
+#         plate_crop = img[y1:y2, x1:x2]
+#
+#         if plate_crop is None or plate_crop.size == 0:
+#             continue
+#
+#         try:
+#             ocr_result = ocr_model.run(plate_crop)[0]
+#             text = ocr_result.plate if hasattr(ocr_result, "plate") else str(ocr_result)
+#             plates.append(text)
+#         except Exception as e:
+#             print(f"OCR error in {image_path}: {e}")
+#             continue
+#
+#     elapsed = round(time.time() - start_time, 3)
+#     print(f"{os.path.basename(image_path)} -> {plates} | Time: {elapsed}s")
+#
+#     return {
+#         "file": os.path.basename(image_path),
+#         "plates": plates,
+#         "processing_time_sec": elapsed
+#     }
+
+
 def read_plate(image_path: str) -> dict:
+    """
+    Read license plate using only OCR model (without detection).
+    Processes the entire image directly with OCR.
+    """
     start_time = time.time()
     img = cv2.imread(image_path)
 
     if img is None:
         return {"error": f"Failed to read image: {image_path}", "plates": []}
 
-    results = detector(image_path, verbose=False)[0]
     plates = []
 
-    for box in results.boxes:
-        x1, y1, x2, y2 = map(int, box.xyxy[0])
-        conf = float(box.conf[0])
-
-        if conf < 0.4:
-            continue
-
-        plate_crop = img[y1:y2, x1:x2]
-
-        if plate_crop is None or plate_crop.size == 0:
-            continue
-
-        try:
-            ocr_result = ocr_model.run(plate_crop)[0]
+    try:
+        ocr_results = ocr_model.run(img)
+        for ocr_result in ocr_results:
             text = ocr_result.plate if hasattr(ocr_result, "plate") else str(ocr_result)
-            plates.append(text)
-        except Exception as e:
-            print(f"OCR error in {image_path}: {e}")
-            continue
+            if text:
+                plates.append(text)
+                
+    except Exception as e:
+        print(f"OCR error in {image_path}: {e}")
 
     elapsed = round(time.time() - start_time, 3)
     print(f"{os.path.basename(image_path)} -> {plates} | Time: {elapsed}s")
