@@ -5,19 +5,11 @@ ultralytics>=8.4.42
 
 # Computer Vision
 opencv-contrib-python>=4.13.0.92
-imutils>=0.5.4
 
 # OCR Libraries
-easyocr>=1.7.2
-pytesseract>=0.3.13
+fast-plate-ocr>=0.1.5
+onnxruntime>=1.16.0
 
 # Scientific Computing
 numpy>=2.2.0
-scipy>=1.15.0
-scikit-image>=0.25.0
-matplotlib>=3.10.0
 pillow>=12.2.0
-
-# Utilities
-requests>=2.33.0
-PyYAML>=6.0.0

@@ -17,7 +17,6 @@ ENV/
 
 # Model weights (too large for git)
 *.weights
-*.pt
 *.pth
 *.onnx
 
@@ -31,6 +30,7 @@ runs/
 
 # Logs
 *.log
+*.json
 
 # OS
 .DS_Store
