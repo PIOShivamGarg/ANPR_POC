@@ -1,11 +1,15 @@
 import cv2
 import time
+import os
 from ultralytics import YOLO
 from fast_plate_ocr import LicensePlateRecognizer
 import onnxruntime as ort
 
 print(ort.get_available_providers())
-model_path = r"D:\Projects\ANPR_POC\yolov8_finetune\license_plate_detector.pt"
+
+model_path = r"D:\projects\ANPR_POC\license_plate_detector.pt"
+input_folder = r"D:\projects\ANPR_POC\Vehicle License Plate List"
+
 detector = YOLO(model_path)
 
 ocr_model = LicensePlateRecognizer(
@@ -15,9 +19,15 @@ ocr_model = LicensePlateRecognizer(
 
 print("Model loaded")
 
+
 def read_plate(image_path):
     start_time = time.time()
     img = cv2.imread(image_path)
+
+    if img is None:
+        print(f"Failed to read: {image_path}")
+        return []
+
     results = detector(image_path)[0]
 
     plates = []
@@ -29,27 +39,39 @@ def read_plate(image_path):
         if conf < 0.4:
             continue
 
-        plate_crop = img[y1:y2, x1:x2]
+        plate_crop = img[y1:y2, x1:x2] 
 
-        # 🔥 safety check
         if plate_crop is None or plate_crop.size == 0:
             continue
-
-        print("Crop shape:", plate_crop.shape)
 
         try:
             text = ocr_model.run(plate_crop)[0]
         except Exception as e:
-            print("OCR error:", e)
+            print(f"OCR error in {image_path}: {e}")
             continue
 
-        print("Plate:", text)
         plates.append(text)
 
-    print(f"Total time: {time.time() - start_time:.3f}s")
+    print(f"{os.path.basename(image_path)} -> {plates} | Time: {time.time() - start_time:.3f}s")
     return plates
 
 
-read_plate(r"D:\Projects\ANPR_POC\inputs\Imagepreview.png")
-# read_plate(r"D:\Projects\ANPR_POC\inputs\images.jpg")
-# read_plate(r"D:\Projects\ANPR_POC\inputs\img1.jpg")
+def process_folder(folder_path):
+    supported_ext = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
+    results = {}
+
+    for file_name in os.listdir(folder_path):
+        if file_name.lower().endswith(supported_ext):
+            image_path = os.path.join(folder_path, file_name)
+            plates = read_plate(image_path)
+            results[file_name] = plates
+
+    return results
+
+
+if __name__ == "__main__":
+    all_results = process_folder(input_folder)
+
+    print("\nFinal Summary:")
+    for file, plates in all_results.items():
+        print(f"{file}: {plates}")
