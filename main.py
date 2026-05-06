@@ -44,7 +44,10 @@ def read_plate(image_path: str) -> dict:
         results = alpr.predict(img)
         for result in results:
             if result.ocr and result.ocr.text:
-                plates.append(result.ocr.text)
+                plates.append({
+                    "text": result.ocr.text,
+                    "region": result.ocr.region
+                })
                 
     except Exception as e:
         print(f"ALPR error in {image_path}: {e}")
