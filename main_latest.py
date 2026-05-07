@@ -1,4 +1,5 @@
 import cv2
+import re
 import time
 import os
 import shutil
@@ -10,18 +11,26 @@ from azure.core.credentials import AzureKeyCredential
 from azure.ai.vision.imageanalysis import ImageAnalysisClient
 from azure.ai.vision.imageanalysis.models import VisualFeatures
 from dotenv import load_dotenv
+from countrystatecity_countries import get_countries, get_states_of_country
 
 # ─── Load Environment Variables ─────────────────────────────────────────────────
 load_dotenv()
 
-# ─── Load Models ────────────────────────────────────────────────────────────────
+# ─── Load All World State Names ──────────────────────────────────────────────────
+print("Loading all world states...")
+_all_states = []
+for country in get_countries():
+    states = get_states_of_country(country.iso2)
+    _all_states.extend(states)
 
-# Initialize ALPR for detection only
+ALL_STATE_NAMES = {state.name.upper(): state.name for state in _all_states}
+print(f"Loaded {len(ALL_STATE_NAMES)} states/regions from all countries")
+
+# ─── Load Models ────────────────────────────────────────────────────────────────
 alpr = ALPR(
     detector_model="yolo-v9-s-608-license-plate-end2end"
 )
 
-# Initialize Azure Computer Vision client for OCR
 endpoint = os.getenv("VISION_ENDPOINT")
 key = os.getenv("VISION_KEY")
 
@@ -36,6 +45,7 @@ vision_client = ImageAnalysisClient(
 print("ALPR model loaded (detection)")
 print("Azure Computer Vision client initialized (OCR)")
 
+
 # ─── FastAPI App ─────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="ANPR API with Azure CV",
@@ -44,33 +54,88 @@ app = FastAPI(
 )
 
 
-# ─── Core Logic ─────────────────────────────────────────────────────────────────
+# ─── Helper: Extract State from OCR Text ────────────────────────────────────────
+def extract_state(text: str) -> str | None:
+    """
+    Match any word or multi-word phrase in the OCR text
+    against the global state names list (all countries).
+    Returns properly cased state name (e.g. 'Washington', 'Texas') or None.
+    """
+    text_upper = text.upper()
 
+    # First try multi-word matches (e.g. "New York", "New South Wales")
+    for state_upper, state_proper in ALL_STATE_NAMES.items():
+        if state_upper in text_upper:
+            return state_proper
+
+    # Fallback: single word match with punctuation stripped
+    words = text_upper.split()
+    for word in words:
+        clean_word = re.sub(r'[^A-Z\s]', '', word).strip()
+        if clean_word in ALL_STATE_NAMES:
+            return ALL_STATE_NAMES[clean_word]
+
+    return None
+
+
+# ─── Helper: Extract Plate Number from OCR Text ─────────────────────────────────
+def extract_plate_number(text: str) -> str | None:
+    """
+    Extract license plate number from raw OCR text using Regex.
+    Handles formats like:
+      - CEH4091       (no separator)
+      - FNR*8034      (star separator - Texas style)
+      - ABC-1234      (hyphen separator)
+      - ABC·1234      (dot/bullet separator)
+    """
+    pattern = r'\b([A-Z0-9]{2,4}[+*\-·]?[A-Z0-9]{2,4})\b'
+    text_upper = text.upper()
+
+    matches = re.findall(pattern, text_upper)
+
+    if not matches:
+        return None
+
+    # Filter out false positives:
+    # - Must have both letters and digits
+    # - Minimum length 5 (without separator)
+    # - Skip known noise words
+    noise_words = {"READ", "TEXT", "ALPR", "STATE", "AUTO"}
+
+    for match in matches:
+        clean = re.sub(r'[+*\-·]', '', match)  # strip separators
+        has_letter = bool(re.search(r'[A-Z]', clean))
+        has_digit = bool(re.search(r'[0-9]', clean))
+        is_noise = match in noise_words
+
+        if has_letter and has_digit and not is_noise and len(clean) >= 5:
+            return clean  # return cleaned plate number without separators e.g. FNRR8034
+
+    return None
+
+
+# ─── Core Logic ─────────────────────────────────────────────────────────────────
 def extract_text_from_image_azure_cv(image_crop) -> str:
     """
     Extract text from a cropped license plate image using Azure Computer Vision.
     """
     try:
-        # Encode image to bytes
         _, buffer = cv2.imencode('.jpg', image_crop)
         image_data = buffer.tobytes()
-        
-        # Call Azure Computer Vision API
+
         result = vision_client.analyze(
             image_data=image_data,
             visual_features=[VisualFeatures.READ]
         )
-        
-        # Extract all text lines
+
         text_lines = []
         if result.read is not None:
             for block in result.read.blocks:
                 for line in block.lines:
                     text_lines.append(line.text)
-        
-        # Join all lines (usually license plates are single line)
+
         return " ".join(text_lines).strip()
-    
+
     except Exception as e:
         print(f"Azure CV OCR error: {e}")
         return ""
@@ -79,6 +144,7 @@ def extract_text_from_image_azure_cv(image_crop) -> str:
 def read_plate(image_path: str) -> dict:
     """
     Read license plate using fast_alpr for detection and Azure CV for OCR.
+    Extracts plate_number via Regex and state via countrystatecity (all countries).
     """
     start_time = time.time()
     img = cv2.imread(image_path)
@@ -89,30 +155,35 @@ def read_plate(image_path: str) -> dict:
     plates = []
 
     try:
-        # Step 1: Use fast_alpr for detection only
         results = alpr.predict(img)
-        
+
         for result in results:
-            # Get bounding box coordinates from detection
             if not result.detection:
                 continue
-            
-            # Access bounding_box through result.detection
+
             bbox = result.detection.bounding_box
             x1, y1, x2, y2 = int(bbox.x1), int(bbox.y1), int(bbox.x2), int(bbox.y2)
-            
-            # Step 2: Crop the detected plate region
+
             plate_crop = img[y1:y2, x1:x2]
-            
-            # Step 3: Use Azure Computer Vision for OCR
-            plate_text = extract_text_from_image_azure_cv(plate_crop)
-            
-            if plate_text:  # Only add if text was detected
+
+            # Get raw OCR text from Azure CV
+            raw_text = extract_text_from_image_azure_cv(plate_crop)
+            print(f"Raw OCR text: {raw_text}")
+
+            if not raw_text:
+                continue
+
+            # Extract plate number and state
+            plate_number = extract_plate_number(raw_text)
+            state = extract_state(raw_text)
+
+            if plate_number:
                 plates.append({
-                    "text": plate_text,
+                    "plate_number": plate_number,
+                    "state": state,
                     "region": result.ocr.region if result.ocr else None
                 })
-                
+
     except Exception as e:
         print(f"ALPR/OCR error in {image_path}: {e}")
 
@@ -138,7 +209,6 @@ def health():
     return {"status": "ok"}
 
 
-# ── Route 1: Single Image Upload ─────────────────────────────────────────────────
 @app.post("/read-plate", summary="Upload a single image to detect license plate")
 async def read_plate_api(file: UploadFile = File(...)):
     supported_ext = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
@@ -149,7 +219,6 @@ async def read_plate_api(file: UploadFile = File(...)):
             detail=f"Unsupported file type. Allowed: {supported_ext}"
         )
 
-    # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(
         delete=False,
         suffix=os.path.splitext(file.filename)[1]
