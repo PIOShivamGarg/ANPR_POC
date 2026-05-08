@@ -1,11 +1,10 @@
-# Computer Vision
-opencv-contrib-python>=4.13.0.92
-
-# ALPR (Automatic License Plate Recognition)
-fast-alpr>=0.1.0
-onnxruntime>=1.15.0
-
-# API Server
-fastapi>=0.100.0
-uvicorn>=0.34.0
-python-multipart>=0.0.5
+opencv-contrib-python
+fast-alpr
+onnxruntime
+fastapi
+uvicorn
+python-multipart
+countrystatecity-countries
+azure-ai-vision-image-analysis
+azure-core
+python-dotenv

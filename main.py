@@ -1,64 +1,36 @@
-import cv2
-import time
 import os
 import shutil
 import tempfile
 from fast_alpr import ALPR
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
+from countrystatecity_countries import get_countries, get_states_of_country
+
 
 # ─── Load Models ────────────────────────────────────────────────────────────────
-
-# Initialize ALPR with default models (handles both detection and OCR)
 alpr = ALPR(
-    detector_model="yolo-v9-s-608-license-plate-end2end",
-    ocr_model="cct-s-v2-global-model"
+    detector_model="yolo-v9-s-608-license-plate-end2end"
 )
-
 print("ALPR model loaded")
+
+
+# ─── Load All World State Names ──────────────────────────────────────────────────
+print("Loading all world states...")
+_all_states = []
+for country in get_countries():
+    states = get_states_of_country(country.iso2)
+    _all_states.extend(states)
+
+ALL_STATE_NAMES = {state.name.upper(): state.name for state in _all_states}
+print(f"Loaded {len(ALL_STATE_NAMES)} states/regions from all countries")
+
 
 # ─── FastAPI App ─────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="ANPR API",
-    description="Automatic Number Plate Recognition — Single Image & Folder Processing",
+    description="Automatic Number Plate Recognition — Detection via Azure Computer Vision or PaddleOCR-VL",
     version="1.0.0"
 )
-
-
-# ─── Core Logic ─────────────────────────────────────────────────────────────────
-
-def read_plate(image_path: str) -> dict:
-    """
-    Read license plate using fast_alpr (handles both detection and OCR).
-    """
-    start_time = time.time()
-    img = cv2.imread(image_path)
-
-    if img is None:
-        return {"error": f"Failed to read image: {image_path}", "plates": []}
-
-    plates = []
-
-    try:
-        results = alpr.predict(img)
-        for result in results:
-            if result.ocr and result.ocr.text:
-                plates.append({
-                    "text": result.ocr.text,
-                    "region": result.ocr.region
-                })
-                
-    except Exception as e:
-        print(f"ALPR error in {image_path}: {e}")
-
-    elapsed = round(time.time() - start_time, 3)
-    print(f"{os.path.basename(image_path)} -> {plates} | Time: {elapsed}s")
-
-    return {
-        "file": os.path.basename(image_path),
-        "plates": plates,
-        "processing_time_sec": elapsed
-    }
 
 
 # ─── API Routes ──────────────────────────────────────────────────────────────────
@@ -73,9 +45,11 @@ def health():
     return {"status": "ok"}
 
 
-# ── Route 1: Single Image Upload ─────────────────────────────────────────────────
-@app.post("/read-plate", summary="Upload a single image to detect license plate")
-async def read_plate_api(file: UploadFile = File(...)):
+from azure_cv import read_plate_azure_cv
+
+# ── Route 1: Read Plate through Azure CV ─────────────────────────────────────────────
+@app.post("/read-plate-azure-cv", summary="Upload a single image to detect license plate using Azure CV")
+async def read_plate_azure_cv_api(file: UploadFile = File(...)):
     supported_ext = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
 
     if not file.filename.lower().endswith(supported_ext):
@@ -84,7 +58,6 @@ async def read_plate_api(file: UploadFile = File(...)):
             detail=f"Unsupported file type. Allowed: {supported_ext}"
         )
 
-    # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(
         delete=False,
         suffix=os.path.splitext(file.filename)[1]
@@ -93,14 +66,36 @@ async def read_plate_api(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        result = read_plate(tmp_path)
-        result["file"] = file.filename  # Show original filename
+        result = read_plate_azure_cv(tmp_path, alpr, ALL_STATE_NAMES)
+        result["file"] = file.filename
         return JSONResponse(content=result)
     finally:
-        os.unlink(tmp_path)  # Clean up temp file
+        os.unlink(tmp_path)
 
 
-# ─── Run ─────────────────────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+from paddleocr_vl import read_plate_paddleocr_vl
+
+# ── Route 2: Read Plate through PaddleOCR-VL ──────────────────────────────────────────────
+@app.post("/read-plate-paddleocr-vl", summary="Upload a single image to detect license plate using PaddleOCR-VL")
+async def read_plate_paddleocr_vl_api(file: UploadFile = File(...)):
+    supported_ext = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
+
+    if not file.filename.lower().endswith(supported_ext):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type. Allowed: {supported_ext}",
+        )
+
+    with tempfile.NamedTemporaryFile(
+        delete=False,
+        suffix=os.path.splitext(file.filename)[1],
+    ) as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        tmp_path = tmp.name
+
+    try:
+        result = read_plate_paddleocr_vl(tmp_path, alpr, ALL_STATE_NAMES)
+        result["file"] = file.filename
+        return JSONResponse(content=result)
+    finally:
+        os.unlink(tmp_path)
