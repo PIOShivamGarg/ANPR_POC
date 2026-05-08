@@ -5,6 +5,6 @@ fastapi
 uvicorn
 python-multipart
 countrystatecity-countries
-azure-ai-vision-image-analysis
+azure-ai-vision-imageanalysis
 azure-core
 python-dotenv

@@ -28,7 +28,7 @@ print(f"Loaded {len(ALL_STATE_NAMES)} states/regions from all countries")
 # ─── FastAPI App ─────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="ANPR API",
-    description="Automatic Number Plate Recognition — Detection via Azure Computer Vision or PaddleOCR-VL",
+    description="Automatic Number Plate Recognition — Detection via Azure Computer Vision",
     version="1.0.0"
 )
 
@@ -67,34 +67,6 @@ async def read_plate_azure_cv_api(file: UploadFile = File(...)):
 
     try:
         result = read_plate_azure_cv(tmp_path, alpr, ALL_STATE_NAMES)
-        result["file"] = file.filename
-        return JSONResponse(content=result)
-    finally:
-        os.unlink(tmp_path)
-
-
-from paddleocr_vl import read_plate_paddleocr_vl
-
-# ── Route 2: Read Plate through PaddleOCR-VL ──────────────────────────────────────────────
-@app.post("/read-plate-paddleocr-vl", summary="Upload a single image to detect license plate using PaddleOCR-VL")
-async def read_plate_paddleocr_vl_api(file: UploadFile = File(...)):
-    supported_ext = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
-
-    if not file.filename.lower().endswith(supported_ext):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type. Allowed: {supported_ext}",
-        )
-
-    with tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=os.path.splitext(file.filename)[1],
-    ) as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        tmp_path = tmp.name
-
-    try:
-        result = read_plate_paddleocr_vl(tmp_path, alpr, ALL_STATE_NAMES)
         result["file"] = file.filename
         return JSONResponse(content=result)
     finally:

@@ -1,27 +1,23 @@
 # ANPR POC - Automatic Number Plate Recognition
 
-A Proof of Concept for Automatic Number Plate Recognition (ANPR) using fast_alpr for license plate detection with dual OCR backend support: **Azure Computer Vision** and **PaddleOCR-VL-1.5**. Includes worldwide state/region recognition and a **REST API** for easy integration.
+A Proof of Concept for Automatic Number Plate Recognition (ANPR) using **fast_alpr** for license plate detection and **Azure Computer Vision** for OCR. Includes worldwide state/region recognition and a **REST API** for easy integration.
 
 ## Features
 
 - **🚀 REST API**: FastAPI-based endpoints for license plate recognition
 - **📷 License Plate Detection**: fast_alpr with YOLO-v9-s-608 end-to-end model
-- **🔍 Dual OCR Backends**: 
-  - **Azure Computer Vision**: Cloud-based OCR with high accuracy
-  - **PaddleOCR-VL-1.5**: Local vision-language model with spotting capabilities
+- **🔍 Cloud OCR**: Azure Computer Vision for high-accuracy text extraction
 - **🌍 Worldwide State Recognition**: Extracts state/region names from all countries using countrystatecity
 - **🔢 Intelligent Plate Extraction**: Regex-based plate number extraction supporting multiple formats (ABC1234, ABC-1234, FNR*8034)
 - **⏱️ Performance Tracking**: Individual processing time for each image
 - **📄 Structured JSON Output**: Detailed response with plate_number, state, region, and processing time
 - **🐳 Docker Ready**: Containerized deployment with docker-compose support
-- **⚡ GPU Support**: CUDA acceleration for PaddleOCR-VL model
 
 ## Requirements
 
 - Python 3.11+
-- CPU or GPU (GPU recommended for PaddleOCR-VL)
-- Azure Computer Vision API credentials (for Azure CV endpoint)
-- CUDA 12.1+ (optional, for GPU acceleration with PaddleOCR)
+- Azure Computer Vision API credentials
+- Internet connection (for Azure CV API calls)
 
 ## Installation
 
@@ -34,25 +30,11 @@ cd ANPR_POC
 ```
 
 2. Install dependencies:
-
-**For CPU-only setup:**
 ```bash
 pip install -r requirements.txt
 ```
 
-**For GPU setup with CUDA 12.1 (recommended for PaddleOCR-VL):**
-```bash
-# Uninstall any existing PyTorch
-pip uninstall -y paddlepaddle-gpu torch torchvision torchaudio
-
-# Install PyTorch with CUDA 12.1 support
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
-# Install other dependencies
-pip install -r requirements.txt
-```
-
-3. Configure Azure Computer Vision (required for `/read-plate-azure-cv` endpoint):
+3. Configure Azure Computer Vision:
    - Create an Azure Computer Vision resource in [Azure Portal](https://portal.azure.com)
    - Copy `.env.example` to `.env` and fill in your credentials:
    ```bash
@@ -63,8 +45,6 @@ pip install -r requirements.txt
    VISION_ENDPOINT=https://your-resource-name.cognitiveservices.azure.com/
    VISION_KEY=your_azure_computer_vision_key_here
    ```
-
-> **Note**: The `/read-plate-paddleocr-vl` endpoint works without Azure credentials (uses local model)
 
 ### Option 2: Docker Installation
 
@@ -108,28 +88,23 @@ docker run -p 8000:8000 \
 
 ```
 ANPR_POC/
-├── data/                        # Input images organized by US states
-│   ├── Alabama/
-│   ├── Alaska/
-│   ├── California/
-│   └── ... (all 50 US states + DC)
-├── main.py                      # FastAPI server + API endpoints
-├── azure_cv.py                  # Azure Computer Vision OCR backend
-├── paddleocr_vl.py              # PaddleOCR-VL-1.5 OCR backend
-├── utils.py                     # Shared utilities (state/plate extraction)
-├── requirements.txt             # Python dependencies
-├── Dockerfile                   # Docker container configuration
-├── docker-compose.yml           # Docker Compose orchestration
-├── .env.example                 # Environment variables template
-├── .env                         # Azure credentials (create from .env.example)
-└── README.md                    # Project documentation
+├── Vehicle License Plate Samples # License Plates Samples
+├── main.py                       # FastAPI server + API endpoints
+├── azure_cv.py                   # Azure Computer Vision OCR backend
+├── utils.py                      # Shared utilities (state/plate extraction)
+├── requirements.txt              # Python dependencies
+├── Dockerfile                    # Docker container configuration
+├── docker-compose.yml            # Docker Compose orchestration
+├── .env.example                  # Environment variables template
+├── .env                          # Azure credentials (create from .env.example)
+└── README.md                     # Project documentation
 ```
 
 ## Configuration
 
 The application uses environment variables for Azure Computer Vision configuration:
 
-**Required for Azure CV endpoint:**
+**Required:**
 - **VISION_ENDPOINT**: Azure Computer Vision endpoint URL
 - **VISION_KEY**: Azure Computer Vision API key
 
@@ -207,7 +182,7 @@ Response:
 }
 ```
 
-#### 3. Read Plate - Azure Computer Vision
+#### 3. Read Plate
 ```bash
 POST http://localhost:8000/read-plate-azure-cv
 Content-Type: multipart/form-data
@@ -233,32 +208,6 @@ Response:
 }
 ```
 
-#### 4. Read Plate - PaddleOCR-VL (Local Model)
-```bash
-POST http://localhost:8000/read-plate-paddleocr-vl
-Content-Type: multipart/form-data
-
-# Example with curl
-curl -X POST "http://localhost:8000/read-plate-paddleocr-vl" \
-     -F "file=@data/Texas/plate.jpg"
-```
-
-Response:
-```json
-{
-  "file": "plate.jpg",
-  "plates": [
-    {
-      "plate_number": "FNR8034",
-      "state": "Texas",
-      "region": "us-tx",
-      "message": null
-    }
-  ],
-  "processing_time_sec": 1.245
-}
-```
-
 **Response Fields:**
 - `plate_number`: Extracted license plate number (cleaned, no separators)
 - `state`: Detected state/region name (worldwide recognition)
@@ -277,10 +226,6 @@ Response:
 # Test with Azure Computer Vision
 curl -X POST "http://localhost:8000/read-plate-azure-cv" \
      -F "file=@data/California/plate1.jpg"
-
-# Test with PaddleOCR-VL (no Azure credentials needed)
-curl -X POST "http://localhost:8000/read-plate-paddleocr-vl" \
-     -F "file=@data/Texas/plate2.jpg"
 ```
 
 #### Using Python Requests
@@ -292,14 +237,6 @@ import requests
 with open("data/California/plate.jpg", "rb") as f:
     response = requests.post(
         "http://localhost:8000/read-plate-azure-cv",
-        files={"file": f}
-    )
-    print(response.json())
-
-# PaddleOCR-VL endpoint  
-with open("data/Texas/plate.jpg", "rb") as f:
-    response = requests.post(
-        "http://localhost:8000/read-plate-paddleocr-vl",
         files={"file": f}
     )
     print(response.json())
@@ -345,14 +282,12 @@ print(result)
 ┌─────────────────────────────────────────┐
 │  2. Crop Detected Plate Regions         │
 │     - Extract ROI from original image   │
-│     - Upscale if needed (PaddleOCR)     │
 └────────┬────────────────────────────────┘
          │
          v
 ┌─────────────────────────────────────────┐
 │  3. OCR on Cropped Plate                │
-│     Option A: Azure Computer Vision     │
-│     Option B: PaddleOCR-VL-1.5          │
+│     - Azure Computer Vision             │
 │     - Returns raw text                  │
 └────────┬────────────────────────────────┘
          │
@@ -383,17 +318,20 @@ print(result)
    - Provides region hints (e.g., "us-ca" for California)
 
 **2. Cropping Phase**
-   - Extracts the detected plate region from the original image
-   - For PaddleOCR: Upscales images smaller than 1500px to improve accuracy
+   - Extracts the detected plate region from the original image using bounding box coordinates
 
 **3. OCR Phase**
-   - **Azure Computer Vision**: Cloud-based OCR with high accuracy
-   - **PaddleOCR-VL-1.5**: Vision-language model with spotting mode
-     - Runs on GPU (CUDA) for best performance
-     - Falls back to CPU if GPU unavailable
+   - **Azure Computer Vision**: Cloud-based OCR with high accuracy for text extraction
+   - Analyzes the cropped plate image and returns raw text
 
 **4. Extraction Phase**
    - **Plate Number**: Regex patterns match formats like:
+     - ABC1234 (no separator)
+     - ABC-1234 (hyphen)
+     - FNR*8034 (star separator)
+   - **State/Region**: Matches OCR text against worldwide state database
+     - Multi-word support (e.g., "New York", "New South Wales")
+     - Case-insensitive matching
      - `ABC1234` (standard)
      - `ABC-1234` (hyphenated)
      - `FNR*8034` (Texas-style star separator)
@@ -417,21 +355,15 @@ print(result)
 - **YOLO-v9-s-608** - End-to-end license plate detection model
 - **ONNX Runtime** - Optimized inference engine
 
-### OCR Engines
+### OCR Engine
 - **Azure Computer Vision** - Microsoft's cloud-based OCR service
   - High accuracy for various lighting conditions
-  - Requires Azure subscription
-- **PaddleOCR-VL-1.5** - PaddlePaddle's vision-language OCR model
-  - Local inference (no cloud dependency)
-  - GPU acceleration support (CUDA)
-  - Transformer-based architecture
+  - Robust text extraction from license plates
+  - Requires Azure subscription and internet connection
 
-### Image Processing & ML
-- **OpenCV** (`opencv-contrib-python`) - Image manipulation and preprocessing
-- **PyTorch** - Deep learning framework for PaddleOCR model
-- **Pillow (PIL)** - Image format conversion and handling
+### Image Processing
+- **OpenCV** (`opencv-python`) - Image manipulation and preprocessing
 - **NumPy** - Numerical operations for image arrays
-- **Transformers** (Hugging Face) - Model loading and inference
 
 ### Data & Utilities
 - **countrystatecity-countries** - Worldwide state/region database
@@ -449,8 +381,6 @@ print(result)
 | Backend | Hardware | Avg Time per Image | Notes |
 |---------|----------|-------------------|-------|
 | Azure CV | Cloud | 0.5-1.0s | Network latency dependent |
-| PaddleOCR-VL | CPU | 2-4s | Model loading overhead on first use |
-| PaddleOCR-VL | GPU (CUDA) | 0.8-1.5s | Significantly faster with GPU |
 
 ### Accuracy Features
 
@@ -461,10 +391,10 @@ print(result)
 
 ### Optimizations
 
-- **Lazy model loading**: PaddleOCR model loads only when first used (saves memory)
-- **Image upscaling**: Small plates automatically upscaled for better OCR accuracy
+- **Fast detection**: YOLO-v9-s-608 model provides quick plate localization
+- **Cloud OCR**: Azure CV handles complex lighting and plate variations
 - **Regex filtering**: Intelligent plate number extraction with noise filtering
-- **GPU acceleration**: CUDA support for PaddleOCR (when available)
+- **Worldwide recognition**: Supports state/region extraction from all countries
 
 ## Error Handling
 
@@ -501,18 +431,6 @@ The API provides detailed error messages in the response:
 **Problem**: `401 Unauthorized` from Azure
 - **Solution**: Verify your `VISION_KEY` is correct in Azure Portal
 
-### PaddleOCR Issues
-
-**Problem**: `CUDA out of memory`
-- **Solution**: Use CPU mode or reduce batch processing
-- Close other GPU-intensive applications
-
-**Problem**: Slow inference on first request
-- **Solution**: This is normal - model loads on first use. Subsequent requests are faster
-
-**Problem**: `torch.cuda.is_available()` returns False
-- **Solution**: Install PyTorch with CUDA support (see Installation section)
-
 ### Docker Issues
 
 **Problem**: Container exits immediately
@@ -530,40 +448,26 @@ The API provides detailed error messages in the response:
 - **Input**: Full images
 - **Output**: Bounding boxes + region codes
 
-### OCR Models
+### OCR Model
 
 #### Azure Computer Vision
 - **Type**: Cloud-based REST API
-- **Provider**: Microsoft Azure
-- **Strengths**: High accuracy, handles various conditions
-- **Limitations**: Requires internet, API costs
-
-#### PaddleOCR-VL-1.5
-- **Model**: `PaddlePaddle/PaddleOCR-VL-1.5`
-- **Type**: Vision-Language Model (Transformer-based)
-- **Mode**: Spotting (text detection + recognition)
-- **Framework**: PyTorch + Hugging Face Transformers
-- **Device**: CUDA GPU (preferred) or CPU
-- **Max Pixels**: 2048 × 28 × 28
-- **Upscaling**: Automatic for images < 1500px
-- **Strengths**: Local inference, no API costs, good for specialized plates
-- **Limitations**: Requires GPU for optimal performance
+- **Provider**: Microsoft Azure Cognitive Services
+- **API Version**: Latest (Read API)
+- **Strengths**: 
+  - High accuracy across various lighting conditions
+  - Handles different plate formats and styles
+  - Pre-trained on diverse text datasets
+  - No local GPU required
+- **Limitations**: 
+  - Requires internet connection
+  - API usage costs (pay-per-call)
+  - Network latency affects response time
 
 ## Dataset
 
-The project includes a comprehensive test dataset organized by US states:
+The project includes a comprehensive test samples in 'Vehicle License Plate Samples' folder.
 
-```
-data/
-├── Alabama/
-├── Alaska/
-├── Arizona/
-...
-├── Wyoming/
-└── WashingtonDC/
-```
-
-Each folder contains sample license plate images from that state for testing and validation.
 
 ## API Response Schema
 
@@ -605,14 +509,10 @@ Contributions are welcome! Please feel free to submit pull requests or open issu
 
 This is a Proof of Concept project for demonstration purposes.
 
-## Authors
-
-Shivam Garg, Dev Tekwani
 
 ## Acknowledgments
 
 - **fast_alpr**: For robust license plate detection
-- **PaddlePaddle**: For the PaddleOCR-VL model
 - **Microsoft Azure**: For Computer Vision API
 - **countrystatecity**: For worldwide region database
 - **FastAPI**: For the excellent web framework
@@ -695,32 +595,3 @@ ocr_model = LicensePlateRecognizer(
 - Average processing time: ~0.5-1s per image (CPU)
 - Detection confidence threshold: 0.4
 - Supports multiple plates per image
-
-## Troubleshooting
-
-**Model not loading?**
-- Verify `license_plate_detector.pt` exists at the specified path
-- Ensure the model is compatible with your Ultralytics version
-
-**OCR errors?**
-- Check that the plate crop is valid and not empty
-- Try adjusting the confidence threshold
-
-**Slow processing?**
-- Enable GPU: Change providers to `["CUDAExecutionProvider"]`
-- Ensure CUDA is properly installed for GPU acceleration
-
-## Future Enhancements
-
-- Real-time video processing
-- API endpoint for web integration
-- Support for multiple regions/countries
-- Database integration for plate tracking
-
-## License
-
-This is a Proof of Concept project.
-
-## Authors
-
-Shivam Garg, Dev Tekwani

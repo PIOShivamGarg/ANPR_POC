@@ -1,9 +1,0 @@
-services:
-  ml-service:
-    build: .
-    ports:
-      - "8000:8000"
-    cpus: 3
-    mem_limit: 1g
-    volumes:
-      - ./Vehicle License Plate List:/app/Vehicle License Plate List
