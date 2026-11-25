@@ -21,10 +21,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY main.py .
+COPY . .
 
-# Copy all images from local folder into container
-COPY ["Vehicle License Plate List", "/app/Vehicle License Plate List"]
+# Copy sample images (optional)
+COPY "Vehicle License Plate Samples" "/app/Vehicle License Plate Samples"
 
 # Set environment variables to avoid Python buffering
 ENV PYTHONUNBUFFERED=1

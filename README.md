@@ -4,14 +4,14 @@ A Proof of Concept for Automatic Number Plate Recognition (ANPR) using **fast_al
 
 ## Features
 
-- **🚀 REST API**: FastAPI-based endpoints for license plate recognition
+- **🚀 REST API**: FastAPI-based endpoint for license plate recognition
 - **📷 License Plate Detection**: fast_alpr with YOLO-v9-s-608 end-to-end model
 - **🔍 Cloud OCR**: Azure Computer Vision for high-accuracy text extraction
 - **🌍 Worldwide State Recognition**: Extracts state/region names from all countries using countrystatecity
 - **🔢 Intelligent Plate Extraction**: Regex-based plate number extraction supporting multiple formats (ABC1234, ABC-1234, FNR*8034)
 - **⏱️ Performance Tracking**: Individual processing time for each image
 - **📄 Structured JSON Output**: Detailed response with plate_number, state, region, and processing time
-- **🐳 Docker Ready**: Containerized deployment with docker-compose support
+- **🐳 Docker Ready**: Containerized deployment
 
 ## Requirements
 
@@ -50,17 +50,6 @@ pip install -r requirements.txt
 
 **Prerequisites**: Create a `.env` file with Azure credentials (or use `.env.example` as template)
 
-**Method 1: Using Docker Compose (Recommended)**
-
-```bash
-# Build and run with docker-compose
-docker-compose up --build
-```
-
-The API will be available at `http://localhost:8000`
-
-**Method 2: Using Docker CLI**
-
 1. Build the Docker image:
 ```bash
 docker build -t anpr-poc .
@@ -68,36 +57,24 @@ docker build -t anpr-poc .
 
 2. Run the container with environment variables:
 ```bash
-docker run -p 8000:8000 \
-  -v "$(pwd)/data:/app/data" \
-  --env-file .env \
-  anpr-poc
+docker run -p 8000:8000 --env-file .env anpr-poc
 ```
 
-**To use custom images:**
-```bash
-docker run -p 8000:8000 \
-  -v "$(pwd)/data:/app/data" \
-  -v "$(pwd)/.env:/app/.env" \
-  anpr-poc
-```
-
-> **Resource Limits**: The docker-compose.yml sets limits to 3 CPUs and 1GB RAM. Adjust as needed for your workload.
+The API will be available at `http://localhost:8000`
 
 ## Project Structure
 
 ```
 ANPR_POC/
-├── Vehicle License Plate Samples # License Plates Samples
-├── main.py                       # FastAPI server + API endpoints
-├── azure_cv.py                   # Azure Computer Vision OCR backend
-├── utils.py                      # Shared utilities (state/plate extraction)
-├── requirements.txt              # Python dependencies
-├── Dockerfile                    # Docker container configuration
-├── docker-compose.yml            # Docker Compose orchestration
-├── .env.example                  # Environment variables template
-├── .env                          # Azure credentials (create from .env.example)
-└── README.md                     # Project documentation
+├── Vehicle License Plate Samples/  # License plate test images
+├── main.py                         # FastAPI server + API endpoint
+├── azure_cv.py                     # Azure Computer Vision OCR backend
+├── utils.py                        # Shared utilities (state/plate extraction)
+├── requirements.txt                # Python dependencies
+├── Dockerfile                      # Docker container configuration
+├── .env.example                    # Environment variables template
+├── .env                            # Azure credentials (create from .env.example)
+└── README.md                       # Project documentation
 ```
 
 ## Configuration
@@ -150,7 +127,7 @@ python -m uvicorn main:app --reload
 
 **Docker:**
 ```bash
-docker-compose up
+docker run -p 8000:8000 --env-file .env anpr-poc
 ```
 
 The API will be available at `http://localhost:8000`
@@ -182,20 +159,20 @@ Response:
 }
 ```
 
-#### 3. Read Plate
+#### 3. Read License Plate (Azure Computer Vision)
 ```bash
 POST http://localhost:8000/read-plate-azure-cv
 Content-Type: multipart/form-data
 
 # Example with curl
 curl -X POST "http://localhost:8000/read-plate-azure-cv" \
-     -F "file=@data/California/image1.jpg"
+     -F "file=@path/to/image.jpg"
 ```
 
 Response:
 ```json
 {
-  "file": "image1.jpg",
+  "file": "image.jpg",
   "plates": [
     {
       "plate_number": "ABC1234",
@@ -223,9 +200,8 @@ Response:
 #### Using cURL
 
 ```bash
-# Test with Azure Computer Vision
 curl -X POST "http://localhost:8000/read-plate-azure-cv" \
-     -F "file=@data/California/plate1.jpg"
+     -F "file=@path/to/plate.jpg"
 ```
 
 #### Using Python Requests
@@ -233,8 +209,7 @@ curl -X POST "http://localhost:8000/read-plate-azure-cv" \
 ```python
 import requests
 
-# Azure Computer Vision endpoint
-with open("data/California/plate.jpg", "rb") as f:
+with open("path/to/plate.jpg", "rb") as f:
     response = requests.post(
         "http://localhost:8000/read-plate-azure-cv",
         files={"file": f}
@@ -257,9 +232,17 @@ async def process_plate(image_path: str):
             )
         return response.json()
 
-result = asyncio.run(process_plate("data/California/plate.jpg"))
+result = asyncio.run(process_plate("path/to/plate.jpg"))
 print(result)
 ```
+
+#### Using Postman
+
+1. **Upload Image to Recognize License Plate**:
+   - Method: `POST`
+   - URL: `http://localhost:8000/read-plate-azure-cv`
+   - Body: `form-data` → Key: `file` (type: File) → Select image file
+   - Click **Send**
 
 ### How It Works
 
@@ -326,12 +309,6 @@ print(result)
 
 **4. Extraction Phase**
    - **Plate Number**: Regex patterns match formats like:
-     - ABC1234 (no separator)
-     - ABC-1234 (hyphen)
-     - FNR*8034 (star separator)
-   - **State/Region**: Matches OCR text against worldwide state database
-     - Multi-word support (e.g., "New York", "New South Wales")
-     - Case-insensitive matching
      - `ABC1234` (standard)
      - `ABC-1234` (hyphenated)
      - `FNR*8034` (Texas-style star separator)
@@ -362,7 +339,7 @@ print(result)
   - Requires Azure subscription and internet connection
 
 ### Image Processing
-- **OpenCV** (`opencv-python`) - Image manipulation and preprocessing
+- **OpenCV** (`opencv-contrib-python`) - Image manipulation and preprocessing
 - **NumPy** - Numerical operations for image arrays
 
 ### Data & Utilities
@@ -372,15 +349,14 @@ print(result)
 
 ### Deployment
 - **Docker** - Containerization
-- **Docker Compose** - Multi-container orchestration
 
 ## Performance
 
 ### Processing Times
 
-| Backend | Hardware | Avg Time per Image | Notes |
-|---------|----------|-------------------|-------|
-| Azure CV | Cloud | 0.5-1.0s | Network latency dependent |
+- **Average Time per Image**: 0.5-1.0 seconds
+- **Hardware**: Cloud-based (Azure Computer Vision)
+- **Network Dependency**: Processing time includes network latency
 
 ### Accuracy Features
 
@@ -392,7 +368,7 @@ print(result)
 ### Optimizations
 
 - **Fast detection**: YOLO-v9-s-608 model provides quick plate localization
-- **Cloud OCR**: Azure CV handles complex lighting and plate variations
+- **Cloud OCR**: Azure Computer Vision handles complex lighting and plate variations
 - **Regex filtering**: Intelligent plate number extraction with noise filtering
 - **Worldwide recognition**: Supports state/region extraction from all countries
 
@@ -423,7 +399,7 @@ The API provides detailed error messages in the response:
 
 ## Troubleshooting
 
-### Azure CV Issues
+### Azure Computer Vision Issues
 
 **Problem**: `VISION_ENDPOINT and VISION_KEY must be set`
 - **Solution**: Create `.env` file with your Azure credentials (see Configuration section)
@@ -431,14 +407,19 @@ The API provides detailed error messages in the response:
 **Problem**: `401 Unauthorized` from Azure
 - **Solution**: Verify your `VISION_KEY` is correct in Azure Portal
 
+**Problem**: Slow processing
+- **Solution**: Processing time depends on network latency to Azure. Ensure stable internet connection.
+
 ### Docker Issues
 
 **Problem**: Container exits immediately
 - **Solution**: Check `.env` file exists and has valid credentials
-- Check logs: `docker-compose logs`
+- Check logs: `docker logs <container_id>`
 
-**Problem**: Out of memory errors
-- **Solution**: Increase memory limit in `docker-compose.yml` (default: 1GB)
+**Problem**: API not starting
+- **Solution**: 
+  - Check if port 8000 is already in use
+  - Verify all dependencies are installed: `pip install -r requirements.txt`
 
 ## Model Information
 
@@ -448,9 +429,7 @@ The API provides detailed error messages in the response:
 - **Input**: Full images
 - **Output**: Bounding boxes + region codes
 
-### OCR Model
-
-#### Azure Computer Vision
+### OCR Model: Azure Computer Vision
 - **Type**: Cloud-based REST API
 - **Provider**: Microsoft Azure Cognitive Services
 - **API Version**: Latest (Read API)
@@ -466,7 +445,7 @@ The API provides detailed error messages in the response:
 
 ## Dataset
 
-The project includes a comprehensive test samples in 'Vehicle License Plate Samples' folder.
+The project includes comprehensive test samples in the `Vehicle License Plate Samples/` folder for testing the API.
 
 
 ## API Response Schema
@@ -516,82 +495,3 @@ This is a Proof of Concept project for demonstration purposes.
 - **Microsoft Azure**: For Computer Vision API
 - **countrystatecity**: For worldwide region database
 - **FastAPI**: For the excellent web framework
-
-### Using Postman
-
-1. **Single Image Upload**:
-   - Method: `POST`
-   - URL: `http://localhost:8000/read-plate`
-   - Body: `form-data` → Key: `file` (type: File) → Select image file
-
-2. **Folder Processing**:
-   - Method: `POST`
-   - URL: `http://localhost:8000/process-folder`
-   - Params (optional): `folder_path` = `/path/to/your/images`
-
-## Troubleshooting
-
-**Model not loading?**
-- Verify `license_plate_detector.pt` exists at the specified path
-- Ensure the model is compatible with your Ultralytics version
-
-**OCR errors?**
-- Check that the plate crop is valid and not empty
-- Try adjusting the confidence threshold
-
-**Slow processing?**
-- Enable GPU: Change providers to `["CUDAExecutionProvider"]`
-- Ensure CUDA is properly installed for GPU acceleration
-
-**API not starting?**
-- Check if port 8000 is already in use
-- Verify all dependencies are installed: `pip install -r requirements.txt`
-
-- Ensure `Vehicle License Plate List` folder exists with images
-
-**Docker API returns 0 images?**
-- Verify images were copied during build: `docker exec -it <container_id> ls "/app/Vehicle License Plate List"`
-- If you added new images after building, rebuild the image: `docker build -t anpr-poc .`
-- Alternatively, use volume mounting to access live files (see installation section)
-- Ensure you mounted the volume with `-v` flag when running `docker run`
-- Verify the mounted path: `docker exec -it <container_id> ls "/app/Vehicle License Plate List"`
-- Or use `folder_path` parameter: `POST /process-folder?folder_path=/app/images`
-2. **Recognition Phase**:
-   - Each detected plate region is cropped
-   - fast-plate-ocr (CCT-S-v2) extracts text from the cropped region
-
-3. **Results**:
-   - Processing time logged for each image
-   - All results saved to JSON file
-
-### Customization
-
-**Adjust confidence threshold** in [main.py](main.py):
-```python
-if conf < 0.4:  # Change 0.4 to your desired threshold
-    continue
-```
-
-**Change OCR model**:
-```python
-ocr_model = LicensePlateRecognizer(
-    "cct-s-v2-global-model",  # or other supported models
-    providers=["CPUExecutionProvider"]  # or ["CUDAExecutionProvider"] for GPU
-)
-```
-
-**Supported image formats**: JPG, JPEG, PNG, BMP, TIFF
-
-## Technologies Used
-
-- **YOLOv8** (Ultralytics) - License plate object detection
-- **fast-plate-ocr** - OCR for license plate text recognition with CCT-S-v2 model
-- **ONNX Runtime** - Inference engine for OCR model
-- **OpenCV** - Image processing and manipulation
-- **PyTorch** - Deep learning framework for YOLO
-
-## Performance
-
-- Average processing time: ~0.5-1s per image (CPU)
-- Detection confidence threshold: 0.4
-- Supports multiple plates per image

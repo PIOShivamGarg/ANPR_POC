@@ -50,6 +50,7 @@ from azure_cv import read_plate_azure_cv
 # ── Route 1: Read Plate through Azure CV ─────────────────────────────────────────────
 @app.post("/read-plate-azure-cv", summary="Upload a single image to detect license plate using Azure CV")
 async def read_plate_azure_cv_api(file: UploadFile = File(...)):
+    breakpoint()
     supported_ext = (".jpg", ".jpeg", ".png", ".bmp", ".tiff")
 
     if not file.filename.lower().endswith(supported_ext):

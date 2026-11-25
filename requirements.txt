@@ -1,8 +1,8 @@
-opencv-contrib-python
 fast-alpr
 onnxruntime
 fastapi
 uvicorn
+gunicorn
 python-multipart
 countrystatecity-countries
 azure-ai-vision-imageanalysis
